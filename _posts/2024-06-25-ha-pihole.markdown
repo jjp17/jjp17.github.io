@@ -6,6 +6,7 @@ categories: networking
 ---
 
 ## Abstract
+This guide is deprecated as of PiHole Verson 6. Gravity-Sync is not compatible with PiHole versions newer than 5.x. [Nebula-sync](https://github.com/lovelaze/nebula-sync) is a new alternative tool for syncing PiHole 6+.
 
 We will setup two PiHole instances in an active/passive failover setup using Keepalived. The two PiHole instances will be synced with each other using gravity-sync, where one instance will be the primary and one will be the secondary.
 
