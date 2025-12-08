@@ -1,12 +1,45 @@
 ---
-layout: post
-title:  "How to setup high-availability PiHole with Keepalived and Nebula-Sync"
-date:   2025-12-06 18:30:00 -0500
-categories: networking
+title: "How to setup high-availability PiHole with Keepalived and Gravity-Sync"
+date: 2024-06-25T23:30:00-05:00
+# weight: 1
+# aliases: ["/first"]
+tags: ["pihole", "keepalived"]
+categories: ["Selfhosting"]
+#author: "Me"
+# author: ["Me", "You"] # multiple authors
+showToc: true
+TocOpen: false
+draft: false
+hidemeta: false
+comments: false
+description: "Two PiHole instances synced with Gravity-Sync"
+canonicalURL: "https://canonical.url/to/page"
+disableHLJS: true # to disable highlightjs
+disableShare: true
+hideSummary: false
+searchHidden: true
+ShowReadingTime: true
+ShowBreadCrumbs: true
+ShowPostNavLinks: true
+ShowWordCount: true
+ShowRssButtonInSectionTermList: true
+UseHugoToc: true
+cover:
+    image: "<image path/url>" # image path/url
+    alt: "<alt text>" # alt text
+    caption: "<text>" # display caption under cover
+    relative: false # when using page bundles set this to true
+    hidden: true # only hide on current single page
+#editPost:
+#    URL: "https://github.com/jjp17.github.io/content"
+#    Text: "Suggest Changes" # edit text
+#    appendFilePath: true # to append file path to Edit link
 ---
 
 ## Abstract
-We will setup two PiHole instances in an active/passive failover setup using Keepalived. The two PiHole instances will be synced with each other using nebula-sync, where one instance will be the primary and one will be the secondary.
+**This guide is deprecated as of PiHole Verson 6. Gravity-Sync is not compatible with PiHole versions newer than 5.x. [Nebula-sync](https://github.com/lovelaze/nebula-sync) is a new alternative tool for syncing PiHole 6+.**
+
+We will setup two PiHole instances in an active/passive failover setup using Keepalived. The two PiHole instances will be synced with each other using gravity-sync, where one instance will be the primary and one will be the secondary.
 
 This setup will allow your primary PiHole instance/hardware to fail for whatever reason and automatically switch DNS duty over to the secondary instance, without reconfiguring clients.
 
@@ -218,82 +251,24 @@ In the case of AWS for example, you'll need to create and attach a secondary "fl
 
 Your notify script should also be able to do this on the master instance when it eventually comes back online.
 
-## Setup Nebula-Sync
+## Setup Gravity-Sync
 
-Now that keepalived is setup, we can install nebula-sync
+Now that keepalived is setup, we can install gravity-sync
 
-nebula-sync is a utility that allows two PiHole instances to keep ad-lists, domain whitelists, clients/groups, Local DNS/CNAME records, and DHCP assignments in sync with each other
+Gravity-sync is a utility that allows two PiHole instances to keep ad-lists, domain whitelists, clients/groups, Local DNS/CNAME records, and DHCP assignments in sync with each other
 
 At a (rough) high level, you will:
-* Create an app password for each PiHole instance
-* Tweak security settings on the secondary PiHole instance
-* Download the Nebula-sync binary/container
-* Configure your nebula-sync env settings
-* Run nebula-sync (on a schedule)
+* Create a gravity-sync user on the each instance
+* Create an SSH key for the gravity-sync user on each instance
+* Share the SSH keys with each instance
+* Install gravity-sync
+* Configure gravity-sync
+* Run gravity-sync
+* Set gravity-sync to automatically run every 15, 30, or 60 minutes
 
-### Configure PiHole instances
+Because gravity-sync and keepalived are not reliant on each other, it is best to just follow the gravity-sync documentation for install steps. 
 
-The PiHole 6 API has been rewritten and now uses REST. The old API Key has been replaced with an "app password".
-
-To create this password go to Settings -> Web Interface/API -> Advanced Settings (Expert mode must be toggled on in the top right corner to see this section). Click the button to create an app password. Take note of the auto generated string (in Notepad or a password manager) and click again to set the password.
-
-Move to the secondary PiHole instance and repeat.
-
-In addition to making the app password, any secondary PiHole instances must have a setting called `webserver.api.app_sudo` enabled. This setting allows configuration changes to be made through the API. This is disabled by default. This is not needed on the primary instance.
-
-On the secondary instance, go to Settings -> All Settings (make sure you still have expert mode enabled). On the top right, make sure you are set to "All Settings" mode and not "Modified Settings" mode. From here select the Webserver and API section and find the `webserver.api.app_sudo` box. Check off Enabled and click Save & Apply. 
-
-### Download and configure Nebula-sync
-
-Since Nebula-sync uses the API of each configured PiHole instance, it can be hosted anywhere so long as nebula-sync can reach both PiHole instances. I will be hosting mine in its own LXC container.
-
-You can download the latest binary from Github [here](https://github.com/lovelaze/nebula-sync/releases/) using `wget`.
-
-Once you have downloaded the latest release, unpack it with `tar -vxzf nebula-sync_*.tar.gz`. Move the binary to wherever you want it.
-
-Now we can create our configuration file. I'll put it in the same spot as our binary. You can name it whatever you'd like. I'll simply name it `env`.
-
-`nano /opt/nebula-sync/env` 
-
-```bash
-PRIMARY=https://primary-pihole|app_password
-REPLICAS=https://secondary-pihole|app_password
-FULL_SYNC=false
-RUN_GRAVITY=false
-CLIENT_SKIP_TLS_VERIFICATION=true
-#CRON=0 */12 * * *
-
-TZ=America/New_York
-
-SYNC_CONFIG_DNS=true
-SYNC_CONFIG_DHCP=true
-SYNC_CONFIG_NTP=true
-SYNC_CONFIG_RESOLVER=true
-SYNC_CONFIG_DATABASE=true
-SYNC_CONFIG_MISC=true
-SYNC_CONFIG_DEBUG=true
-
-SYNC_GRAVITY_DHCP_LEASES=true
-SYNC_GRAVITY_GROUP=true
-SYNC_GRAVITY_AD_LIST=true
-SYNC_GRAVITY_AD_LIST_BY_GROUP=true
-SYNC_GRAVITY_DOMAIN_LIST=true
-SYNC_GRAVITY_DOMAIN_LIST_BY_GROUP=true
-SYNC_GRAVITY_CLIENT=true
-SYNC_GRAVITY_CLIENT_BY_GROUP=true
-```
-
-The only lines to change are the `PRIMARY` and `REPLICAS`. You should replace it with your pihole IP addresses and their corresponding app password.
-
-A few things we changed from the example env file provided are `RUN_GRAVITY=false` and `CLIENT_SKIP_TLS_VERIFICATION=true`. Since I use the default, self-signed certificates that came with PiHole, we need to skip the TLS Verification. You can set this back to false if you use real certificates. There seems to be a bug with the `RUN_GRAVITY` option that crashes FTL when nebula-sync tries to request an update to gravity - so we will disable it until it is resolved.
-
-### Run Nebula-sync on a schedule
-
-Unless you have the `CRON` environment set (which only works with the containerized version) - nebula-sync will run once, sync the replicas with the primary, and exit. To schedule nebula-sync, we will use CRON at the system level.
-
-`crontab -e`
-
-Add in the following line to your crontab changing the paths to your env file and binary: `0 * * * * /opt/nebula-sync/nebula-sync run --env-file /opt/nebula-sync/env`
+[You can find their install guide here under "Setup Steps"](https://github.com/vmstan/gravity-sync)
 
 ## Closing
 
