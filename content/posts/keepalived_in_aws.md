@@ -268,24 +268,16 @@ systemctl restart nginx.service
 
 Granted - it's a bit hacky but it works. You may need to modify what the link is named in your OS (eth1, ens0, etc) or change the method to bring the new interface up.
 
-## Starting Keepalived
+## Going further
 
-Run these commands on both machines to start keepalived
+At this point we should have a fully functioning Master/Backup setup with Keepalived in AWS. When the master instance goes offline, the backup will take control of the floating Network Interface and attach it to itself, simulating the action of moving a VIP.
 
-Enable and start the keepalived service
-```bash
-sudo systemctl enable --now keepalived.service
-```
+For my use case described above, we would make another web server on the backup instance and write another script to turn on the main instances with a button displayed on the backup webUI. You'd probably want to add some authentication layer in front as well (unless you everybody to turn your instances back on)
 
-Check the status to make sure it's running
-```bash
-sudo systemctl status keepalived.service
-```
+## Closing
 
-If there are any issues, investigate the logs using `journalctl`
-```bash
-sudo journalctl -fu keepalived.service
-```
+Is this recommended to use this method in the cloud? No.
 
+Are there better ways to do this? Probably.
 
-
+This is the solution I came up with on the fly for saving some money. It serves its purpose and shows how keepalived can theoretically be used in the cloud. 
