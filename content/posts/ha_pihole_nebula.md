@@ -1,6 +1,6 @@
 ---
 title: "How to setup high-availability PiHole with Keepalived and Nebula-Sync"
-date: 2025-8-14T23:30:00-05:00
+date: 2025-08-14T23:30:00-05:00
 # weight: 1
 # aliases: ["/first"]
 tags: ["pihole", "keepalived"]
